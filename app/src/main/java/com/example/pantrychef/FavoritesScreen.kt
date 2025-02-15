@@ -115,7 +115,7 @@ fun FavoritesScreenContent() {
                     onClick = {
                         (context as? Activity)?.finish()
                     },
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = 0.dp, top = 0.dp, end = 0.dp, bottom = 36.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D3557))
                 ) {
                     Text("Back")

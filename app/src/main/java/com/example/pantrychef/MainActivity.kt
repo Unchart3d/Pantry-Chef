@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
@@ -14,6 +15,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -75,6 +77,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.KITKAT)
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("MutableCollectionMutableState")
 @Composable
@@ -191,7 +194,7 @@ fun PantryChefScreen() {
                         }
                         val apiKey = apikey.API_KEY
                         val ingredientsQuery = ingredientsList.joinToString(",") { URLEncoder.encode(it, StandardCharsets.UTF_8.toString()) }
-                        val url = "https://api.spoonacular.com/recipes/findByIngredients?apiKey=$apiKey&ingredients=$ingredientsQuery"
+                        val url = "https://api.spoonacular.com/recipes/findByIngredients?apiKey=$apiKey&ingredients=$ingredientsQuery&number=100"
 
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
@@ -219,7 +222,7 @@ fun PantryChefScreen() {
                             val intent = Intent(context, FavoritesScreen::class.java)
                             context.startActivity(intent)
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.padding(start = 0.dp, top = 0.dp, end = 0.dp, bottom = 36.dp).fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D3557))
                     ) {
                         Text("Favorites")
