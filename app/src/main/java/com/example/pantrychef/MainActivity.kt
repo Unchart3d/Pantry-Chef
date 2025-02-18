@@ -187,35 +187,61 @@ fun PantryChefScreen() {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ){
-                    Button(onClick = {
-                        if (ingredientsList.isEmpty()) {
-                            Toast.makeText(context, "Please add ingredients first", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        val apiKey = apikey.API_KEY
-                        val ingredientsQuery = ingredientsList.joinToString(",") { URLEncoder.encode(it, StandardCharsets.UTF_8.toString()) }
-                        val url = "https://api.spoonacular.com/recipes/findByIngredients?apiKey=$apiKey&ingredients=$ingredientsQuery&number=100"
+                    Button(
+                        onClick = {
+                            if (ingredientsList.isEmpty()) {
+                                Toast.makeText(context, "Please add ingredients first", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
 
-                        CoroutineScope(Dispatchers.IO).launch {
-                            try {
-                                val response = URL(url).readText()
-                                withContext(Dispatchers.Main) {
-                                    Log.d("API_RESPONSE", response)
+                            val (lastIngredients, cachedResponse) = getLastQuery(context)
+
+                            if (lastIngredients == ingredientsList && !cachedResponse.isNullOrEmpty()) {
+                                // Use cached response safely
+                                Log.d("API_CACHE", "Using cached response")
+                                try {
                                     val intent = Intent(context, RecipeListScreen::class.java)
-                                    intent.putExtra("recipes_list", response)
+                                    intent.putExtra("recipes_list", cachedResponse)
                                     context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Log.e("CACHE_ERROR", "Error using cached response: ${e.message}")
+                                    Toast.makeText(context, "Error loading cached recipes", Toast.LENGTH_SHORT).show()
                                 }
-                            }catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    Log.e("API_ERROR", "Failed to fetch recipes: ${e.message}")
-                                    Toast.makeText(context, "Failed to fetch recipes", Toast.LENGTH_SHORT).show()
+                            } else {
+                                // Make API call since ingredients changed
+                                val apiKey = apikey.API_KEY
+                                val ingredientsQuery = ingredientsList.joinToString(",") { URLEncoder.encode(it, StandardCharsets.UTF_8.toString()) }
+                                val url = "https://api.spoonacular.com/recipes/findByIngredients?apiKey=$apiKey&ingredients=$ingredientsQuery&number=100"
+
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    try {
+                                        val response = URL(url).readText()
+                                        withContext(Dispatchers.Main) {
+                                            Log.d("API_RESPONSE", response)
+
+                                            // Save new query and response
+                                            saveLastQuery(context, ingredientsList, response)
+
+                                            val intent = Intent(context, RecipeListScreen::class.java)
+                                            intent.putExtra("recipes_list", response)
+                                            context.startActivity(intent)
+                                        }
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            Log.e("API_ERROR", "Failed to fetch recipes: ${e.message}")
+                                            Toast.makeText(context, "Failed to fetch recipes", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D3557)),
-                        modifier = Modifier.fillMaxWidth()) {
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D3557)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text("Recipes")
                     }
+
+
 
                     Button(
                         onClick = {
@@ -233,6 +259,35 @@ fun PantryChefScreen() {
         }
     }
 }
+
+fun saveLastQuery(context: Context, ingredients: List<String>, response: String) {
+    val sharedPreferences = context.getSharedPreferences("RecipeCache", Context.MODE_PRIVATE)
+    val editor = sharedPreferences.edit()
+    val jsonIngredients = Gson().toJson(ingredients)
+
+    Log.d("CACHE_DEBUG", "Saving ingredients: $jsonIngredients")
+    Log.d("CACHE_DEBUG", "Saving response: $response")
+
+    editor.putString("last_ingredients", jsonIngredients)
+    editor.putString("last_response", response)
+    editor.apply()
+}
+
+
+fun getLastQuery(context: Context): Pair<List<String>, String?> {
+    val sharedPreferences = context.getSharedPreferences("RecipeCache", Context.MODE_PRIVATE)
+
+    val jsonIngredients = sharedPreferences.getString("last_ingredients", "[]")
+    val lastResponse = sharedPreferences.getString("last_response", null)
+
+    val ingredientsList: List<String> = Gson().fromJson(jsonIngredients, object : TypeToken<List<String>>() {}.type)
+
+    Log.d("CACHE_DEBUG", "Retrieved ingredients: $ingredientsList")
+    Log.d("CACHE_DEBUG", "Retrieved response: $lastResponse")
+
+    return Pair(ingredientsList, lastResponse)
+}
+
 
 
 private fun recognizeText(bitmap: Bitmap, ingredientsList: ArrayList<String>, context: Context, ingredientsListState: MutableState<ArrayList<String>>) {

@@ -8,8 +8,8 @@ data class Recipe(
     val id: Int,
     val image: String?,
     val title: String,
-
-    val missedIngredients: List<MissedIngredient>?
+    val missedIngredients: List<MissedIngredient>?,
+    val instructions: String? = null
 ) : Parcelable
 
 @Parcelize
