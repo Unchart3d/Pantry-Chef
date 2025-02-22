@@ -44,28 +44,24 @@ class RecipeListScreen : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val recipesJson = intent.getStringExtra("recipes_list")
-        Log.d("CACHE_DEBUG", "Received JSON: $recipesJson")
-
-        if (recipesJson.isNullOrEmpty()) {
+        val (_, cachedResponse) = getLastQuery(this)
+        if (cachedResponse.isNullOrEmpty()) {
             Toast.makeText(this, "No recipes found", Toast.LENGTH_SHORT).show()
+            finish()
             return
         }
 
         try {
             val recipes: List<Recipe> = Gson().fromJson(
-                recipesJson,
+                cachedResponse,
                 object : TypeToken<List<Recipe>>() {}.type
             )
-            Log.d("CACHE_DEBUG", "Parsed recipes: $recipes")
-
             setContent {
                 RecipeListScreenContent(recipes = recipes)
             }
-
         } catch (e: Exception) {
-            Log.e("CACHE_ERROR", "Error parsing recipes: ${e.message}")
             Toast.makeText(this, "Error loading recipes", Toast.LENGTH_SHORT).show()
+            finish()
         }
     }
 

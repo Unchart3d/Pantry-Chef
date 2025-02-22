@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.pantrychef.models.Recipe
 import com.example.pantrychef.ui.theme.PantryChefTheme
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -77,7 +78,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.KITKAT)
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("MutableCollectionMutableState")
 @Composable
@@ -148,7 +148,7 @@ fun PantryChefScreen() {
 
                     Button(onClick = {
                         if (ingredientText.isNotEmpty()) {
-                            ingredientsList = ArrayList(ingredientsList + ingredientText) // Update the list
+                            ingredientsList = ArrayList(ingredientsList + ingredientText.trim()) // Update the list
                             saveArrayList(ingredientsList, context)
                             ingredientText = "" // Clear the text field
                             ingredientsListState.value = ingredientsList // Update the list state
@@ -197,11 +197,12 @@ fun PantryChefScreen() {
                             val (lastIngredients, cachedResponse) = getLastQuery(context)
 
                             if (lastIngredients == ingredientsList && !cachedResponse.isNullOrEmpty()) {
-                                // Use cached response safely
+                                // Use cached response
                                 Log.d("API_CACHE", "Using cached response")
                                 try {
+                                    // Use cachedResponse instead of response here
+                                    saveLastQuery(context, ingredientsList, cachedResponse) // ← Fix this line
                                     val intent = Intent(context, RecipeListScreen::class.java)
-                                    intent.putExtra("recipes_list", cachedResponse)
                                     context.startActivity(intent)
                                 } catch (e: Exception) {
                                     Log.e("CACHE_ERROR", "Error using cached response: ${e.message}")
@@ -210,26 +211,25 @@ fun PantryChefScreen() {
                             } else {
                                 // Make API call since ingredients changed
                                 val apiKey = apikey.API_KEY
-                                val ingredientsQuery = ingredientsList.joinToString(",") { URLEncoder.encode(it, StandardCharsets.UTF_8.toString()) }
-                                val url = "https://api.spoonacular.com/recipes/findByIngredients?apiKey=$apiKey&ingredients=$ingredientsQuery&number=100"
+                                val ingredientsQuery = ingredientsList.joinToString(",") { URLEncoder.encode(it.trim(), StandardCharsets.UTF_8.toString()) }
+                                val url = "https://api.spoonacular.com/recipes/findByIngredients?apiKey=$apiKey&ingredients=$ingredientsQuery&number=50"
 
+                                // Modified API call section
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        val response = URL(url).readText()
+                                        val apiResponse = URL(url).readText()  // Renamed for clarity
+                                        val type = object : TypeToken<List<Recipe>>() {}.type
+                                        val recipes = Gson().fromJson<List<Recipe>>(apiResponse, type)
+
                                         withContext(Dispatchers.Main) {
-                                            Log.d("API_RESPONSE", response)
-
-                                            // Save new query and response
-                                            saveLastQuery(context, ingredientsList, response)
-
+                                            // Save to SharedPreferences and launch activity
+                                            saveLastQuery(context, ingredientsList, apiResponse)
                                             val intent = Intent(context, RecipeListScreen::class.java)
-                                            intent.putExtra("recipes_list", response)
                                             context.startActivity(intent)
                                         }
                                     } catch (e: Exception) {
                                         withContext(Dispatchers.Main) {
-                                            Log.e("API_ERROR", "Failed to fetch recipes: ${e.message}")
-                                            Toast.makeText(context, "Failed to fetch recipes", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "API Error: ${e.message}", Toast.LENGTH_LONG).show()
                                         }
                                     }
                                 }
@@ -262,15 +262,10 @@ fun PantryChefScreen() {
 
 fun saveLastQuery(context: Context, ingredients: List<String>, response: String) {
     val sharedPreferences = context.getSharedPreferences("RecipeCache", Context.MODE_PRIVATE)
-    val editor = sharedPreferences.edit()
-    val jsonIngredients = Gson().toJson(ingredients)
-
-    Log.d("CACHE_DEBUG", "Saving ingredients: $jsonIngredients")
-    Log.d("CACHE_DEBUG", "Saving response: $response")
-
-    editor.putString("last_ingredients", jsonIngredients)
-    editor.putString("last_response", response)
-    editor.apply()
+    with(sharedPreferences.edit()) {
+        putString("last_response", response)
+        apply()  // Using apply() instead of commit() for async operation
+    }
 }
 
 
